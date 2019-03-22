@@ -815,10 +815,10 @@ customized by changing `+default-repeat-forward-key' and
   ;; Have C-u behave similarly to `doom/backward-to-bol-or-indent'.
   ;; NOTE SPC u replaces C-u as the universal argument.
   (map! :gi "C-u" #'doom/backward-kill-to-bol-and-indent
-        :gi "C-w" #'backward-kill-word
+        :gi "C-w" #'backward-kill-word)
         ;; Vimmish ex motion keys
-        :gi "C-b" #'backward-word
-        :gi "C-f" #'forward-word)
+        ;;:gi "C-b" #'backward-word
+        ;;:gi "C-f" #'forward-word)
 
   (after! view
     (define-key view-mode-map [escape] #'View-quit-all))
