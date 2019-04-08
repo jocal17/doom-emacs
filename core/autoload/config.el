@@ -19,15 +19,6 @@
   (doom-project-find-file doom-private-dir))
 
 ;;;###autoload
-(defun doom/open-env ()
-  "TODO"
-  (interactive)
-  (when (and (not (file-exists-p doom-env-file))
-             (y-or-n-p "User doesn't have an envvar file, generate one?"))
-    (doom/reload-env))
-  (find-file doom-env-file))
-
-;;;###autoload
 (defun doom/reload (&optional force-p)
   "Reloads your private config.
 
@@ -63,7 +54,12 @@ Uses the same mechanism as 'bin/doom env reload'."
     (sit-for 1))
   (unless (file-readable-p doom-env-file)
     (error "Failed to generate env file"))
-  (load-env-vars doom-env-file))
+  (load-env-vars doom-env-file)
+  (setq-default
+   exec-path (append (split-string (getenv "PATH") ":")
+                     (list exec-directory))
+   shell-file-name (or (getenv "SHELL")
+                       shell-file-name)))
 
 ;;;###autoload
 (defun doom/reload-font ()

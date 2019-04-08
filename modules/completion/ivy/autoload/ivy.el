@@ -17,18 +17,22 @@
 (defun +ivy-rich-buffer-name (candidate)
   "Display the buffer name.
 
-Displays buffers in other projects in `font-lock-doc-face', and
-temporary/special buffers in `font-lock-comment-face'."
-  (with-current-buffer (get-buffer candidate)
-    (propertize candidate
-     'face (cond ((string-match-p "^ *\\*" candidate)
-                  'font-lock-comment-face)
-                 ((not buffer-file-name) nil)
-                 ((not (file-in-directory-p
-                        buffer-file-name
-                        (or (doom-project-root)
-                            default-directory)))
-                  'font-lock-doc-face)))))
+Buffers that are considered unreal (see `doom-real-buffer-p') are dimmed with
+`+ivy-buffer-unreal-face'."
+  (if (doom-real-buffer-p (get-buffer candidate))
+      candidate
+    (propertize candidate 'face +ivy-buffer-unreal-face)))
+
+;;;###autoload
+(defun +ivy-rich-buffer-icon (candidate)
+  "Display the icon for CANDIDATE buffer.
+
+Otherwise show the fundamental-mode icon."
+  (with-current-buffer candidate
+    (let ((icon (all-the-icons-icon-for-mode major-mode)))
+      (if (symbolp icon)
+          (all-the-icons-icon-for-mode 'fundamental-mode)
+        icon))))
 
 
 ;;
@@ -55,16 +59,14 @@ temporary/special buffers in `font-lock-comment-face'."
           (current
            (setq prompt "Switch to buffer: "
                  action #'ivy--switch-buffer-action))
-          (t
-           (setq prompt "Switch to buffer in other window: "
+          ((setq prompt "Switch to buffer in other window: "
                  action #'ivy--switch-buffer-other-window-action)))
     (when +ivy-buffer-preview
       (cond ((not (and ivy-use-virtual-buffers
                        (eq +ivy-buffer-preview 'everything)))
              (setq update #'+ivy--switch-buffer-preview
                    unwind #'+ivy--switch-buffer-unwind))
-            (t
-             (setq update #'+ivy--switch-buffer-preview-all
+            ((setq update #'+ivy--switch-buffer-preview-all
                    unwind #'+ivy--switch-buffer-unwind))))
     (ivy-read prompt 'internal-complete-buffer
               :action action
@@ -303,8 +305,8 @@ order.
                          (projectile-project-name))
                         ((file-relative-name directory project-root))))))
     (require 'counsel)
-    (let ((counsel-more-chars-alist
-           (if query '((t . 1)) counsel-more-chars-alist)))
+    (let ((ivy-more-chars-alist
+           (if query '((t . 1)) ivy-more-chars-alist)))
       (pcase engine
         ('grep
          (let ((args (if recursive " -R"))
