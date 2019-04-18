@@ -5,8 +5,9 @@
 (def-package! doom-modeline
   :hook (after-init . doom-modeline-mode)
   :init
-  ;; prevent flash of unstyled modeline at startup
-  (setq-default mode-line-format nil)
+  (unless after-init-time
+    ;; prevent flash of unstyled modeline at startup
+    (setq-default mode-line-format nil))
   ;; We display project info in the modeline ourselves
   (setq projectile-dynamic-mode-line nil)
   ;; Set these early so they don't trigger variable watchers
@@ -48,6 +49,7 @@
     (if (eq major-mode 'magit-status-mode)
         (doom-modeline-set-project-modeline)
       (hide-mode-line-mode)))
+  (remove-hook 'magit-mode-hook #'doom-modeline-set-project-modeline)
   (add-hook 'magit-mode-hook #'+modeline|hide-in-non-status-buffer)
 
   ;; Show indentation style in modeline. I'm not using

@@ -92,7 +92,7 @@ If any hook returns non-nil, all hooks after it are ignored.")
               (setq prefix def))
           (when prefix
             (setq key `(general--concat t ,prefix ,key)))
-          (let* ((udef (doom-unquote def))
+          (let* ((udef (cdr-safe (doom-unquote def)))
                  (bdef (if (general--extended-def-p udef)
                            (general--extract-def (general--normalize-extended-def udef))
                          def)))
@@ -102,20 +102,26 @@ If any hook returns non-nil, all hooks after it are ignored.")
                     forms))
             (when-let* ((desc (plist-get udef :which-key)))
               (push `(which-key-add-key-based-replacements
+                       (general--concat t doom-leader-alt-key ,key)
+                       ,desc)
+                    wkforms)
+              (push `(which-key-add-key-based-replacements
                        (general--concat t doom-leader-key ,key)
                        ,desc)
                     wkforms))))))
     (macroexp-progn
      (append (nreverse forms)
              (when wkforms
-               `((with-eval-after-load 'which-key
+               `((after! which-key
                    ,@(nreverse wkforms))))))))
 
 (defmacro define-leader-key! (&rest args)
   "Define <leader> keys.
 
 Uses `general-define-key' under the hood, but does not support :states,
-:wk-full-keys or :keymaps."
+:wk-full-keys or :keymaps. Use `map!' for a more convenient interface.
+
+See `doom-leader-key' and `doom-leader-alt-key' to change the leader prefix."
   `(general-define-key
     :states nil
     :wk-full-keys nil
@@ -123,10 +129,17 @@ Uses `general-define-key' under the hood, but does not support :states,
     ,@args))
 
 (defmacro define-localleader-key! (&rest args)
+  "Define <localleader> key.
+
+Uses `general-define-key' under the hood, but does not support :major-modes,
+:states, :prefix or :non-normal-prefix. Use `map!' for a more convenient
+interface.
+
+See `doom-localleader-key' and `doom-localleader-alt-key' to change the
+localleader prefix."
   (if (featurep 'evil)
       ;; :non-normal-prefix doesn't apply to non-evil sessions (only evil's
-      ;; emacs state), so we must redefine `define-localleader-key!' to behave
-      ;; differently where evil is present.
+      ;; emacs state)
       `(general-define-key
         :states '(normal visual motion emacs)
         :major-modes t
@@ -324,7 +337,7 @@ For example, :nvi will map to (list 'normal 'visual 'insert). See
       (cond ((and (listp def)
                   (keywordp (car-safe (setq unquoted (doom-unquote def)))))
              (setq def (list 'quote (plist-put unquoted :which-key desc))))
-            ((setq def (list 'quote
+            ((setq def (cons 'list
                              (if (and (equal key "")
                                       (null def))
                                  `(:ignore t :which-key ,desc)

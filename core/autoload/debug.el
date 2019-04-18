@@ -16,7 +16,7 @@ ready to be pasted in a bug report on github."
     (format
      (concat "- OS: %s (%s)\n"
              "- Emacs: %s (%s)\n"
-             "- Doom: %s (%s %s)\n"
+             "- Doom: %s (%s)\n"
              "- Graphic display: %s (daemon: %s)\n"
              "- System features: %s\n"
              "- Details:\n"
@@ -31,9 +31,7 @@ ready to be pasted in a bug report on github."
      system-type system-configuration
      emacs-version (format-time-string "%b %d, %Y" emacs-build-time)
      doom-version
-     (or (vc-git--symbolic-ref "core/core.el")
-         "n/a")
-     (or (vc-git-working-revision "core/core.el")
+     (or (string-trim (shell-command-to-string "git log -1 --format=\"%D %h %ci\""))
          "n/a")
      (display-graphic-p) (daemonp)
      (bound-and-true-p system-configuration-features)
@@ -47,7 +45,7 @@ ready to be pasted in a bug report on github."
      (if IS-WINDOWS
          "n/a"
        (with-temp-buffer
-         (unless (zerop (call-process "uname" nil t nil "-a"))
+         (unless (zerop (call-process "uname" nil t nil "-msrv"))
            (insert (format "%s" system-type)))
          (string-trim (buffer-string))))
      (or (cl-loop with cat = nil
