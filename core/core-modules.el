@@ -11,6 +11,9 @@
         doom-modules-dir)
   "A list of module root directories. Order determines priority.")
 
+(defvar doom-inhibit-module-warnings (not noninteractive)
+  "If non-nil, don't emit deprecated or missing module warnings at startup.")
+
 (defconst doom-obsolete-modules
   '((:feature (version-control (:emacs vc) (:ui vc-gutter))
               (spellcheck (:tools flyspell))
@@ -309,7 +312,8 @@ to least)."
           (make-hash-table :test 'equal
                            :size (if modules (length modules) 150)
                            :rehash-threshold 1.0)))
-  (let (category m)
+  (let ((inhibit-message doom-inhibit-module-warnings)
+        category m)
     (while modules
       (setq m (pop modules))
       (cond ((keywordp m) (setq category m))
@@ -321,16 +325,22 @@ to least)."
                              (new (assq module obsolete)))
                    (let ((newkeys (cdr new)))
                      (if (null newkeys)
-                         (message "Warning: the %s module is deprecated" key)
-                       (message "Warning: the %s module is deprecated. Use %s instead."
+                         (message "WARNING %s is deprecated" key)
+                       (message "WARNING %s is deprecated, enabling %s instead"
                                 (list category module) newkeys)
                        (push category modules)
                        (dolist (key newkeys)
-                         (setq modules (append key modules)))
+                         (push (if flags
+                                   (nconc (cdr key) flags)
+                                 (cdr key))
+                               modules)
+                         (push (car key) modules))
                        (throw 'doom-modules t))))
                  (if-let* ((path (doom-module-locate-path category module)))
                      (doom-module-set category module :flags flags :path path)
-                   (message "Warning: couldn't find the %s %s module" category module))))))))
+                   (message "WARNING Couldn't find the %s %s module" category module))))))))
+  (when noninteractive
+    (setq doom-inhibit-module-warnings t))
   `(setq doom-modules ',doom-modules))
 
 (defvar doom-disabled-packages)
@@ -399,22 +409,29 @@ to have them return non-nil (or exploit that to overwrite Doom's config)."
                          (substring (symbol-name when) 1)))
        ,@body)))
 
-(defmacro require! (category module &rest plist)
-  "Loads the module specified by CATEGORY (a keyword) and MODULE (a symbol)."
-  `(let ((module-path (doom-module-locate-path ,category ',module)))
+(defmacro require! (category module &rest flags)
+  "Loads the CATEGORY MODULE module with FLAGS.
+
+CATEGORY is a keyword, MODULE is a symbol and FLAGS are symbols.
+
+  (require! :lang php +lsp)
+
+This is for testing and internal use. This is not the correct way to enable a
+module."
+  `(let ((doom-modules ,doom-modules)
+         (module-path (doom-module-locate-path ,category ',module)))
      (doom-module-set
       ,category ',module
-      ,@(when plist
-          (let ((old-plist (doom-module-get category module)))
-            (unless (plist-member plist :flags)
-              (plist-put plist :flags (plist-get old-plist :flags)))
-            (unless (plist-member plist :path)
-              (plist-put plist :path (or (plist-get old-plist :path)
-                                         (doom-module-locate-path category module)))))
+      ,@(let ((plist (doom-module-get category module)))
+          (when flags
+            (plist-put plist :flags flags))
+          (unless (plist-member plist :path)
+            (plist-put plist :path (doom-module-locate-path category module)))
           plist))
      (if (directory-name-p module-path)
          (condition-case-unless-debug ex
-             (let ((doom--current-module ',(cons category module)))
+             (let ((doom--current-module ',(cons category module))
+                   (doom--current-flags ',flags))
                (load! "init" module-path :noerror)
                (let ((doom--stage 'config))
                  (load! "config" module-path :noerror)))
