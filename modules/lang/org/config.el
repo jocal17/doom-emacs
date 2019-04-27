@@ -27,7 +27,7 @@
 (advice-add #'toc-org-insert-toc :before #'+org*unfold-toc)
 
 (def-package! evil-org
-  :when (featurep! :feature evil +everywhere)
+  :when (featurep! :editor evil +everywhere)
   :hook (org-mode . evil-org-mode)
   :init
   (defvar evil-org-key-theme '(navigation insert textobjects))
@@ -35,7 +35,7 @@
   (add-hook 'org-load-hook #'+org|setup-evil-keybinds)
   (add-hook 'evil-org-mode-hook #'evil-normalize-keymaps)
   :config
-  (add-hook 'org-open-at-point-functions #'evil-set-jump)
+  (setq evil-org-retain-visual-state-on-shift t)
   ;; change `evil-org-key-theme' instead
   (advice-add #'evil-org-set-key-theme :override #'ignore)
   (def-package! evil-org-agenda
@@ -475,6 +475,7 @@ conditions where a window's buffer hasn't changed at the time this hook is run."
   (+org|setup-hacks)
   (+org|setup-custom-links)
 
+  (add-hook 'org-open-at-point-functions #'doom|set-jump)
 
   ;; Cross-module configuration
   (set-popup-rules!

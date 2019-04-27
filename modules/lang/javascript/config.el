@@ -173,13 +173,13 @@
   (map! :localleader
         :map tide-mode-map
         "R"   #'tide-restart-server
-        "f"   #'tide-reformat
+        "f"   #'tide-format
         "rs"  #'tide-rename-symbol
         "roi" #'tide-organize-imports))
 
 
 (def-package! xref-js2
-  :when (featurep! :feature lookup)
+  :when (featurep! :tools lookup)
   :after (:or js2-mode rjsx-mode)
   :config
   (set-lookup-handlers! '(js2-mode rjsx-mode)
@@ -189,7 +189,7 @@
 (def-package! js2-refactor
   :hook ((js2-mode rjsx-mode) . js2-refactor-mode)
   :config
-  (when (featurep! :feature evil +everywhere)
+  (when (featurep! :editor evil +everywhere)
     (let ((js2-refactor-mode-map (evil-get-auxiliary-keymap js2-refactor-mode-map 'normal t t)))
       (js2r-add-keybindings-with-prefix (format "%s r" doom-localleader-key)))))
 

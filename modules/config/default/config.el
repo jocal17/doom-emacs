@@ -36,6 +36,14 @@
   ;; or specific :post-handlers with:
   ;;   (sp-pair "{" nil :post-handlers '(:rem ("| " "SPC")))
   (after! smartparens
+    ;; Smartparens' navigation feature is neat, but does not justify how
+    ;; expensive it is. It's also less useful for evil users. This may need to
+    ;; be reactivated for non-evil users though. Needs more testing!
+    (defun doom|disable-smartparens-navigate-skip-match ()
+      (setq sp-navigate-skip-match nil
+            sp-navigate-consider-sgml-tags nil))
+    (add-hook 'after-change-major-mode-hook #'doom|disable-smartparens-navigate-skip-match)
+
     ;; Autopair quotes more conservatively; if I'm next to a word/before another
     ;; quote, I likely don't want to open a new pair.
     (let ((unless-list '(sp-point-before-word-p
@@ -175,10 +183,9 @@
 (define-key! help-map
   ;; new keybinds
   "'"    #'describe-char
-  "A"    #'doom/describe-autodefs
   "B"    #'doom/open-bug-report
-  "D"    #'doom/open-manual
-  "E"    #'doom/open-vanilla-sandbox
+  "D"    #'doom/help
+  "E"    #'doom/sandbox
   "M"    #'doom/describe-active-minor-mode
   "O"    #'+lookup/online
   "T"    #'doom/toggle-profiler
@@ -187,7 +194,6 @@
   "C-k"  #'describe-key-briefly
   "C-l"  #'describe-language-environment
   "C-m"  #'info-emacs-manual
-  "C-v"  #'doom/version
 
   ;; Unbind `help-for-help'. Conflicts with which-key's help command for the
   ;; <leader> h prefix. It's already on ? and F1 anyway.
@@ -202,29 +208,40 @@
   "rf"   #'doom/reload-font
   "re"   #'doom/reload-env
 
+  ;; replaces `apropos-documentation' b/c `apropos' covers this
+  "d" nil
+  "d/"   #'doom/help-search
+  "da"   #'doom/help-autodefs
+  "db"   #'doom/report-bug
+  "dd"   #'doom/toggle-debug-mode
+  "df"   #'doom/help-faq
+  "dh"   #'doom/help
+  "dm"   #'doom/help-modules
+  "dn"   #'doom/help-news
+  "dp"   #'doom/help-packages
+  "dc"   #'doom/help-package-config
+  "ds"   #'doom/sandbox
+  "dt"   #'doom/toggle-profiler
+  "dv"   #'doom/version
+
   ;; replaces `apropos-command'
   "a"    #'apropos
   ;; replaces `describe-copying' b/c not useful
   "C-c"  #'describe-coding-system
-  ;; replaces `apropos-documentation' b/c `apropos' covers this
-  "d"    #'doom/describe-module
   ;; replaces `Info-got-emacs-command-node' b/c redundant w/ `Info-goto-node'
   "F"    #'describe-face
   ;; replaces `view-hello-file' b/c annoying
-  "h"    #'doom/describe-symbol
+  "h"    #'doom/help
   ;; replaces `describe-language-environment' b/c remapped to C-l
   "L"    #'global-command-log-mode
   ;; replaces `view-emacs-news' b/c it's on C-n too
-  "n"    #'doom/open-news
+  "n"    #'doom/help-news
   ;; replaces `finder-by-keyword'
-  ;; "p"    #'doom/describe-package
+  "p"    #'doom/describe-package
   ;; replaces `describe-package' b/c redundant w/ `doom/describe-package'
   "P"    #'find-library)
 
 (after! which-key
-  (which-key-add-key-based-replacements doom-leader-key "<leader>")
-  (which-key-add-key-based-replacements doom-localleader-key "<localleader>")
-
   (which-key-add-key-based-replacements "C-h r" "reload")
   (when (featurep 'evil)
     (which-key-add-key-based-replacements (concat doom-leader-key     " r") "reload")

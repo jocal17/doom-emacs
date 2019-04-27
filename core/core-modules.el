@@ -17,21 +17,32 @@
 (defconst doom-obsolete-modules
   '((:feature (version-control (:emacs vc) (:ui vc-gutter))
               (spellcheck (:tools flyspell))
-              (syntax-checker (:tools flycheck)))
+              (syntax-checker (:tools flycheck))
+              (evil (:editor evil))
+              (snippets (:editor snippets))
+              (file-templates (:editor file-templates))
+              (workspaces (:ui workspaces))
+              (eval (:tools eval))
+              (lookup (:tools lookup))
+              (debugger (:tools debugger)))
     (:tools (rotate-text (:editor rotate-text)))
     (:emacs (electric-indent (:emacs electric))
             (hideshow (:editor fold)))
-    (:ui (doom-modeline (:ui modeline)))
-    (:ui (fci (:ui fill-column)))
-    (:ui (evil-goggles (:ui ophints))))
-  "An alist of deprecated modules, mapping deprecated modules to an optional new
-location (which will create an alias). Each CAR and CDR is a (CATEGORY .
-MODULES). E.g.
+    (:ui (doom-modeline (:ui modeline))
+         (fci (:ui fill-column))
+         (evil-goggles (:ui ophints))))
+  "A tree alist that maps deprecated modules to their replacement(s).
 
-  ((:emacs . electric-indent) . (:emacs electric))
-  ((:feature . version-control) (:emacs vc) (:ui . vc-gutter))
+Each entry is a three-level tree. For example:
 
-A warning will be put out if these deprecated modules are used.")
+  (:feature (version-control (:emacs vc) (:ui vc-gutter))
+            (spellcheck (:tools flyspell))
+            (syntax-checker (:tools flycheck)))
+
+This marks :feature version-control, :feature spellcheck and :feature
+syntax-checker modules obsolete. e.g. If :feature version-control is found in
+your `doom!' block, a warning is emitted before replacing it with :emacs vc and
+:ui vc-gutter.")
 
 (defvar doom--current-module nil)
 (defvar doom--current-flags nil)
@@ -225,7 +236,7 @@ non-nil, return paths of possible modules, activated or otherwise."
 (after! use-package-core
   ;; :ensure and :pin don't work well with Doom, so we forcibly remove them.
   (dolist (keyword '(:ensure :pin))
-    (setq use-package-keywords (delq keyword use-package-keywords)))
+    (delq! keyword use-package-keywords))
 
   ;; Insert new deferring keywords
   (dolist (keyword '(:defer-incrementally :after-call))
@@ -422,12 +433,12 @@ module."
          (module-path (doom-module-locate-path ,category ',module)))
      (doom-module-set
       ,category ',module
-      ,@(let ((plist (doom-module-get category module)))
-          (when flags
-            (plist-put plist :flags flags))
-          (unless (plist-member plist :path)
-            (plist-put plist :path (doom-module-locate-path category module)))
-          plist))
+      (let ((plist (doom-module-get ,category ',module)))
+        ,(when flags
+           `(plist-put plist :flags `,flags))
+        (unless (plist-member plist :path)
+          (plist-put plist :path ,(doom-module-locate-path category module)))
+        plist))
      (if (directory-name-p module-path)
          (condition-case-unless-debug ex
              (let ((doom--current-module ',(cons category module))

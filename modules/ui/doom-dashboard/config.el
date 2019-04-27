@@ -137,6 +137,7 @@ PLIST can have the following properties:
   "Major mode for the DOOM dashboard buffer."
   :syntax-table nil
   :abbrev-table nil
+  (buffer-disable-undo)
   (setq truncate-lines t)
   (setq-local whitespace-style nil)
   (setq-local show-trailing-whitespace nil)
@@ -152,6 +153,7 @@ PLIST can have the following properties:
   (add-hook 'post-command-hook #'+doom-dashboard|reposition-point nil t))
 
 (define-key! +doom-dashboard-mode-map
+  [left-margin mouse-1]   #'ignore
   [remap forward-button]  #'+doom-dashboard/forward-button
   [remap backward-button] #'+doom-dashboard/backward-button
   "n"       #'forward-button
@@ -161,33 +163,25 @@ PLIST can have the following properties:
   [down]    #'forward-button
   [up]      #'backward-button
   [tab]     #'forward-button
-  [backtab] #'backward-button)
+  [backtab] #'backward-button
 
-(map! :when (featurep 'evil)
-      :map +doom-dashboard-mode-map
-      :n "j"       #'forward-button
-      :n "k"       #'backward-button
-      :n "n"       #'forward-button
-      :n "p"       #'backward-button
-      :n "C-n"     #'forward-button
-      :n "C-p"     #'backward-button
-      :n [down]    #'forward-button
-      :n [up]      #'backward-button
-      :n [tab]     #'forward-button
-      :n [backtab] #'backward-button
-      [left-margin mouse-1]      #'ignore
-      [remap evil-next-visual-line]     #'forward-button
-      [remap evil-previous-visual-line] #'backward-button
-      [remap evil-delete]        #'ignore
-      [remap evil-delete-line]   #'ignore
-      [remap evil-insert]        #'ignore
-      [remap evil-append]        #'ignore
-      [remap evil-replace]       #'ignore
-      [remap evil-replace-state] #'ignore
-      [remap evil-change]        #'ignore
-      [remap evil-change-line]   #'ignore
-      [remap evil-visual-char]   #'ignore
-      [remap evil-visual-line]   #'ignore)
+  ;; Evil remaps
+  [remap evil-next-line]     #'forward-button
+  [remap evil-previous-line] #'backward-button
+  [remap evil-next-visual-line]     #'forward-button
+  [remap evil-previous-visual-line] #'backward-button
+  [remap evil-paste-pop-next] #'forward-button
+  [remap evil-paste-pop]      #'backward-button
+  [remap evil-delete]         #'ignore
+  [remap evil-delete-line]    #'ignore
+  [remap evil-insert]         #'ignore
+  [remap evil-append]         #'ignore
+  [remap evil-replace]        #'ignore
+  [remap evil-replace-state]  #'ignore
+  [remap evil-change]         #'ignore
+  [remap evil-change-line]    #'ignore
+  [remap evil-visual-char]    #'ignore
+  [remap evil-visual-line]    #'ignore)
 
 
 ;;
@@ -272,7 +266,9 @@ project (which may be different across perspective)."
   (when (bound-and-true-p persp-mode)
     (set-persp-parameter
      'last-project-root (doom-project-root)
-     (if (perspective-p persp) persp (get-current-persp)))))
+     (if (persp-p persp)
+         persp
+       (get-current-persp)))))
 
 
 ;;
@@ -332,11 +328,9 @@ controlled by `+doom-dashboard-pwd-policy'."
           ((null lastcwd)
            default-directory)
           ((eq policy 'last-project)
-           (let ((cwd default-directory)
-                 (default-directory lastcwd))
-             (if (doom-project-p)
-                 (doom-project-root)
-               cwd)))
+           (let ((cwd default-directory))
+             (or (doom-project-root lastcwd)
+                 cwd)))
           ((eq policy 'last)
            lastcwd)
           ((warn "`+doom-dashboard-pwd-policy' has an invalid value of '%s'"

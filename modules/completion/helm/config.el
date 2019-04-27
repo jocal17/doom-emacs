@@ -79,7 +79,7 @@ be negative.")
         ;; disable special behavior for left/right, M-left/right keys.
         helm-ff-lynx-style-map nil)
 
-  (when (featurep! :feature evil +everywhere)
+  (when (featurep! :editor evil +everywhere)
     (setq helm-default-prompt-display-function #'+helm--set-prompt-display))
 
   :init
@@ -143,7 +143,9 @@ be negative.")
   (define-key helm-ag-edit-map [remap quit-window] #'helm-ag--edit-abort)
   (set-popup-rule! "^\\*helm-ag-edit" :size 0.35 :ttl 0 :quit nil)
   ;; Recenter after jumping to match
-  (advice-add #'helm-ag--find-file-action :after-while #'doom*recenter))
+  (advice-add #'helm-ag--find-file-action :after-while #'doom*recenter)
+  ;; And record position before jumping
+  (advice-add #'helm-ag--find-file-action :around #'doom*set-jump-maybe))
 
 
 ;; `helm-bookmark'
