@@ -1,7 +1,7 @@
 ;;; lang/emacs-lisp/autoload.el -*- lexical-binding: t; -*-
 
 ;;
-;; Library
+;;; Library
 
 ;;;###autoload
 (defun +emacs-lisp-eval (beg end)
@@ -68,6 +68,14 @@ library/userland functions"
                (throw 'matcher t)))))
     nil))
 
+;;;###autoload
+(defun +emacs-lisp-lookup-documentation (thing)
+  "Lookup THING with `helpful-variable' if it's a variable, `helpful-callable'
+if it's callable, `apropos' otherwise."
+  (if thing
+      (doom/describe-symbol thing)
+    (call-interactively #'doom/describe-symbol)))
+
 ;; `+emacs-lisp-highlight-vars-and-faces' is a potentially expensive function
 ;; and should be byte-compiled, no matter what, to ensure it runs as fast as
 ;; possible:
@@ -77,7 +85,7 @@ library/userland functions"
 
 
 ;;
-;; Commands
+;;; Commands
 
 ;;;###autoload
 (defun +emacs-lisp/open-repl ()
@@ -92,21 +100,21 @@ library/userland functions"
 
 
 ;;
-;; Hooks
+;;; Hooks
 
 ;;;###autoload
 (defun +emacs-lisp|extend-imenu ()
-  "Improve imenu support with better expression regexps and Doom-specific forms."
+  "Improve imenu support in `emacs-lisp-mode', including recognition for Doom's API."
   (setq imenu-generic-expression
-        '(("Evil commands" "^\\s-*(evil-define-\\(?:command\\|operator\\|motion\\) +\\(\\_<[^ ()\n]+\\_>\\)" 1)
+        `(("Section" "^[ \t]*;;;;* \\(\\_<[^ ()\n]+\\_>\\)" 1)
+          ("Evil commands" "^\\s-*(evil-define-\\(?:command\\|operator\\|motion\\) +\\(\\_<[^ ()\n]+\\_>\\)" 1)
           ("Unit tests" "^\\s-*(\\(?:ert-deftest\\|describe\\) +\"\\([^\")]+\\)\"" 1)
-          ("Package" "^\\s-*(\\(?:def-\\)?package! +\\(\\_<[^ ()\n]+\\_>\\)" 1)
-          ("Package" "^\\s-*;;;###package\\s-+\\(\\_<[^ ()\n]+\\_>\\)$" 1)
+          ("Package" "^\\s-*(\\(?:;;;###package\\|def-package!\\|package!\\|use-package\\|after!\\) +\\(\\_<[^ ()\n]+\\_>\\)" 1)
           ("Major modes" "^\\s-*(define-derived-mode +\\([^ ()\n]+\\)" 1)
+          ("Minor modes" "^\\s-*(define-\\(?:global\\(?:ized\\)?-minor\\|generic\\|minor\\)-mode +\\([^ ()\n]+\\)" 1)
           ("Modelines" "^\\s-*(def-modeline! +\\([^ ()\n]+\\)" 1)
           ("Modeline segments" "^\\s-*(def-modeline-segment! +\\([^ ()\n]+\\)" 1)
-          ("Advice" "^\\s-*(def\\(?:\\(?:ine-\\)?advice\\))")
-          ("Modes" "^\\s-*(define-\\(?:global\\(?:ized\\)?-minor\\|generic\\|minor\\)-mode +\\([^ ()\n]+\\)" 1)
+          ("Advice" "^\\s-*(\\(?:def\\(?:\\(?:ine\\)?-advice\\)\\) +\\([^ )\n]+\\)" 1)
           ("Macros" "^\\s-*(\\(?:cl-\\)?def\\(?:ine-compile-macro\\|macro\\) +\\([^ )\n]+\\)" 1)
           ("Inline functions" "\\s-*(\\(?:cl-\\)?defsubst +\\([^ )\n]+\\)" 1)
           ("Functions" "^\\s-*(\\(?:cl-\\)?def\\(?:un\\|un\\*\\|method\\|generic\\|-memoized!\\) +\\([^ ,)\n]+\\)" 1)
@@ -114,20 +122,27 @@ library/userland functions"
           ("Types" "^\\s-*(\\(cl-def\\(?:struct\\|type\\)\\|def\\(?:class\\|face\\|group\\|ine-\\(?:condition\\|error\\|widget\\)\\|package\\|struct\\|t\\(?:\\(?:hem\\|yp\\)e\\)\\)\\)\\s-+'?\\(\\(?:\\sw\\|\\s_\\|\\\\.\\)+\\)" 2))))
 
 ;;;###autoload
-(defun +emacs-lisp|disable-flycheck-maybe ()
-  "Disable flycheck-mode if in emacs.d."
+(defun +emacs-lisp|reduce-flycheck-errors-in-emacs-config ()
+  "Remove `emacs-lisp-checkdoc' checker and reduce `emacs-lisp' checker
+verbosity when editing a file in `doom-private-dir' or `doom-emacs-dir'."
   (when (and (bound-and-true-p flycheck-mode)
              (eq major-mode 'emacs-lisp-mode)
              (or (not buffer-file-name)
                  (cl-loop for dir in (list doom-emacs-dir doom-private-dir)
                           if (file-in-directory-p buffer-file-name dir)
                           return t)))
-    (flycheck-mode -1)))
-
-;;;###autoload
-(defun +emacs-lisp-lookup-documentation (thing)
-  "Lookup THING with `helpful-variable' if it's a variable, `helpful-callable'
-if it's callable, `apropos' otherwise."
-  (if thing
-      (doom/describe-symbol thing)
-    (call-interactively #'doom/describe-symbol)))
+    (add-to-list (make-local-variable 'flycheck-disabled-checkers)
+                 'emacs-lisp-checkdoc)
+    (set (make-local-variable 'flycheck-emacs-lisp-check-form)
+         (concat "(progn "
+                 (prin1-to-string
+                  `(progn
+                     (load ,user-init-file t t)
+                     (defmacro map! (&rest _))
+                     (setq byte-compile-warnings
+                           '(obsolete cl-functions
+                             interactive-only make-local mapcar
+                             suspicious constants))))
+                 " "
+                 (default-value 'flycheck-emacs-lisp-check-form)
+                 ")"))))

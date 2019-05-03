@@ -39,6 +39,8 @@ detected.")
  scroll-conservatively 1001
  scroll-margin 2
  scroll-preserve-screen-position t
+ mouse-wheel-scroll-amount '(5 ((shift) . 2))
+ mouse-wheel-progressive-speed nil ; don't accelerate scrolling
  ;; Whitespace (see `editorconfig')
  indent-tabs-mode nil
  require-final-newline t
@@ -110,7 +112,9 @@ savehist file."
   ;; persistent point location in buffers
   :after-call (after-find-file dired-initial-position-hook)
   :config
-  (setq save-place-file (concat doom-cache-dir "saveplace"))
+  (setq save-place-file (concat doom-cache-dir "saveplace")
+        save-place-forget-unreadable-files t
+        save-place-limit 200)
   (defun doom*recenter-on-load-saveplace (&rest _)
     "Recenter on cursor when loading a saved place."
     (if buffer-file-name (ignore-errors (recenter))))
@@ -130,9 +134,8 @@ savehist file."
         recentf-max-saved-items 300
         recentf-filename-handlers '(file-truename abbreviate-file-name)
         recentf-exclude
-        (list #'file-remote-p "\\.\\(?:gz\\|gif\\|svg\\|png\\|jpe?g\\)$"
-              "^/tmp/" "^/ssh:" "\\.?ido\\.last$" "\\.revive$" "/TAGS$"
-              "^/var/folders/.+$"
+        (list "\\.\\(?:gz\\|gif\\|svg\\|png\\|jpe?g\\)$" "^/tmp/" "^/ssh:"
+              "\\.?ido\\.last$" "\\.revive$" "/TAGS$" "^/var/folders/.+$"
               ;; ignore private DOOM temp files (but not all of them)
               (lambda (file) (file-in-directory-p file doom-local-dir))))
   (unless noninteractive
@@ -222,11 +225,12 @@ savehist file."
                 doom-inhibit-indent-detection
                 (member (substring (buffer-name) 0 1) '(" " "*"))
                 (memq major-mode doom-detect-indentation-excluded-modes))
-      (dtrt-indent-mode +1)))
+      ;; Don't display messages in the echo area, but still log them
+      (let ((inhibit-message (not doom-debug-mode)))
+        (dtrt-indent-mode +1))))
   (add-hook! '(change-major-mode-after-body-hook read-only-mode-hook)
     #'doom|detect-indentation)
   :config
-  (setq dtrt-indent-verbosity (if doom-debug-mode 2 0))
   ;; always keep tab-width up-to-date
   (push '(t tab-width) dtrt-indent-hook-generic-mapping-list)
 
@@ -247,7 +251,7 @@ savehist file."
   (advice-add #'dtrt-indent-mode :around #'doom*fix-broken-smie-modes))
 
 
-(def-package! undo-tree                                        
+(def-package! undo-tree
   ;; Branching & persistent undo
   :after-call (doom-switch-buffer-hook after-find-file)
   :config
@@ -258,21 +262,7 @@ savehist file."
         undo-tree-enable-undo-in-region nil
         undo-tree-history-directory-alist
         `(("." . ,(concat doom-cache-dir "undo-tree-hist/"))))
-  (global-undo-tree-mode +1)
-
-  ;; compress undo history with xz/gzip
-  (and (fset 'doom*undo-tree-make-history-save-file-name
-             (cond ((executable-find "zstd") (lambda (file) (concat file ".zst")))
-                   ((executable-find "gzip") (lambda (file) (concat file ".gz")))))
-       (advice-add #'undo-tree-make-history-save-file-name :filter-return
-                   #'doom*undo-tree-make-history-save-file-name))
-
-  (defun doom*strip-text-properties-from-undo-history (&rest _)
-    (dolist (item buffer-undo-list)
-      (and (consp item)
-           (stringp (car item))
-           (setcar item (substring-no-properties (car item))))))
-  (advice-add #'undo-list-transfer-to-tree :before #'doom*strip-text-properties-from-undo-history))
+  (global-undo-tree-mode +1))
 
 
 (def-package! command-log-mode

@@ -14,6 +14,11 @@
 ;;
 ;;; Reasonable defaults
 
+;;;###package avy
+(setq avy-all-windows nil
+      avy-background t)
+
+
 (after! epa
   (setq epa-file-encrypt-to
         (or epa-file-encrypt-to
@@ -106,7 +111,7 @@
 
     ;; Highjacks backspace to:
     ;;  a) balance spaces inside brackets/parentheses ( | ) -> (|)
-    ;;  b) delete space-indented `tab-width' steps at a time
+    ;;  b) delete up to nearest column multiple of `tab-width' at a time
     ;;  c) close empty multiline brace blocks in one step:
     ;;     {
     ;;     |
@@ -136,7 +141,7 @@
 ;; OS specific fixes
 (when IS-MAC
   ;; Fix MacOS shift+tab
-  (define-key input-decode-map [S-iso-lefttab] [backtab])
+  (define-key key-translation-map [S-iso-lefttab] [backtab])
   ;; Fix conventional OS keys in Emacs
   (map! "s-`" #'other-frame  ; fix frame-switching
         ;; fix OS window/frame navigation/manipulation keys
@@ -188,6 +193,7 @@
   "E"    #'doom/sandbox
   "M"    #'doom/describe-active-minor-mode
   "O"    #'+lookup/online
+  "R"    #'doom/reload
   "T"    #'doom/toggle-profiler
   "V"    #'set-variable
   "W"    #'+default/man-or-woman
