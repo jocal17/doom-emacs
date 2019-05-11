@@ -7,6 +7,7 @@
 - [[#emacs][:emacs]]
 - [[#tools][:tools]]
 - [[#lang][:lang]]
+- [[#email][:email]]
 - [[#app][:app]]
 - [[#collab][:collab]]
 - [[#config][:config]]
@@ -15,7 +16,7 @@
 Modules that provide new interfaces or frameworks for completion, including code
 completion.
 
-+ [[file:completion/company/README.org][company]] =+auto +childframe +tng=: The ultimate code completion backend
++ [[file:completion/company/README.org][company]] =+childframe +tng=: The ultimate code completion backend
 + helm =+fuzzy +childframe=: *Another* search engine for love and life
 + ido: The /other/ *other* search engine for love and life
 + [[file:completion/ivy/README.org][ivy]] =+fuzzy +childframe=: /The/ search engine for love and life
@@ -145,12 +146,16 @@ Modules that bring support for a language or group of languages to Emacs.
 + web =+lsp=:
 + vala:
 
+* :email
++ [[file:email/mu4e/README.org][mu4e]] =+gmail=:
++ notmuch:
++ wanderlust =+gmail=:
+
 * :app
 Large, opinionated modules that transform and take over Emacs, i.e.
 Doom-specific porcelains.
 
 + calendar:
-+ [[file:app/email/README.org][email]] =+gmail=:
 + [[file:app/irc/README.org][irc]]:
 + rss =+org=:
 + twitter:

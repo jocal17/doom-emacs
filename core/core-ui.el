@@ -91,7 +91,6 @@ behavior). Do not set this directly, this is let-bound in `doom|init-theme'.")
               (minibufferp))
     (let ((doom-inhibit-switch-window-hooks t))
       (run-hooks 'doom-switch-window-hook)
-      (doom-log "Window switched to %s" (selected-window))
       (setq doom--last-window (selected-window)))))
 
 (defun doom|run-switch-frame-hooks (&rest _)
@@ -100,19 +99,25 @@ behavior). Do not set this directly, this is let-bound in `doom|init-theme'.")
               (frame-parameter nil 'parent-frame))
     (let ((doom-inhibit-switch-frame-hooks t))
       (run-hooks 'doom-switch-frame-hook)
-      (doom-log "Frame switched to %s" (selected-frame))
       (setq doom--last-frame (selected-frame)))))
 
-(defun doom*run-switch-buffer-hooks (orig-fn buffer-or-name &rest args)
+(defun doom*run-switch-buffer-hooks (orig-fn &rest args)
   (if (or doom-inhibit-switch-buffer-hooks
           (if (eq orig-fn 'switch-to-buffer)
               (car args) ; norecord
-            (eq (get-buffer buffer-or-name) (current-buffer))))
-      (apply orig-fn buffer-or-name args)
+            (eq (car args) (current-buffer)))) ; buffer-or-name
+      (apply orig-fn args)
     (let ((doom-inhibit-switch-buffer-hooks t))
-      (doom-log "Buffer switched in %s" (selected-window))
-      (prog1 (apply orig-fn buffer-or-name args)
+      (prog1 (apply orig-fn args)
         (run-hooks 'doom-switch-buffer-hook)))))
+
+(defun doom*run-switch-to-next-prev-buffer-hooks (orig-fn &rest args)
+  (if doom-inhibit-switch-buffer-hooks
+      (apply orig-fn args)
+    (let ((doom-inhibit-switch-buffer-hooks t))
+      (when-let* ((result (apply orig-fn args)))
+        (run-hooks 'doom-switch-buffer-hook)
+        result))))
 
 (defun doom*run-load-theme-hooks (theme &optional _no-confirm no-enable)
   "Set up `doom-load-theme-hook' to run after `load-theme' is called."
@@ -142,8 +147,7 @@ read-only or not file-visiting."
          (if (bound-and-true-p whitespace-newline-mode)
              (cl-union (if indent-tabs-mode '(indentation) '(tabs tab-mark))
                        whitespace-style)
-           `(face ,@(if indent-tabs-mode '(indentation) '(tabs tab-mark))
-             trailing)))
+           `(face ,@(if indent-tabs-mode '(indentation) '(tabs tab-mark)))))
     (whitespace-mode +1)))
 
 
@@ -217,6 +221,10 @@ read-only or not file-visiting."
 (add-to-list 'default-frame-alist '(vertical-scroll-bars))
 ;; prompts the user for confirmation when deleting a non-empty frame
 (global-set-key [remap delete-frame] #'doom/delete-frame)
+
+;; Show trailing whitespace
+(setq show-trailing-whitespace t)
+(setq-hook! 'minibuffer-setup-hook show-trailing-whitespace nil) ; except in minibuffers
 
 
 ;;
@@ -441,11 +449,6 @@ character that looks like a space that `whitespace-mode' won't affect.")
 ;;
 ;;; Theme & font
 
-(defvar doom-last-window-system
-  (if (daemonp) 'daemon initial-window-system)
-  "The `window-system' of the last frame. If this doesn't match the current
-frame's window-system, the theme will be reloaded.")
-
 (defun doom|init-fonts ()
   "Loads fonts.
 
@@ -476,34 +479,12 @@ Fonts are specified by `doom-font', `doom-variable-pitch-font',
                 (font-get (caddr e) :family))
        (signal 'doom-error e)))))
 
-(defun doom|init-theme ()
-  "Load the theme specified by `doom-theme'."
+(defun doom|init-theme (&optional frame)
+  "Load the theme specified by `doom-theme' in FRAME."
   (when (and doom-theme (not (memq doom-theme custom-enabled-themes)))
-    (let ((doom--prefer-theme-elc t))
-      (load-theme doom-theme t))))
-
-(defun doom|reload-theme-maybe (_frame)
-  "Reloads the theme if the display device has changed."
-  (unless (cl-find doom-last-window-system (frame-list) :key #'framep-on-display)
-    (setq doom-last-window-system nil)
-    (doom|reload-theme-in-frame-maybe (selected-frame))))
-
-(defun doom|reload-theme-in-frame-maybe (frame)
-  "Reloads the theme if the display device has changed.
-
-Getting themes to remain consistent across GUI Emacs, terminal Emacs and daemon
-Emacs is hairy. `doom|init-theme' sorts out the initial GUI frame. Attaching
-`doom|reload-theme-in-frame-maybe' to `after-make-frame-functions' sorts out
-daemon and emacsclient frames.
-
-There will still be issues with simultaneous gui and terminal (emacsclient)
-frames, however. There's always `doom/reload-theme' if you need it!"
-  (when (and doom-theme
-             (framep frame)
-             (not (eq doom-last-window-system (framep-on-display frame))))
-    (with-selected-frame frame
-      (load-theme doom-theme t))
-    (setq doom-last-window-system (framep-on-display frame))))
+    (with-selected-frame (or frame (selected-frame))
+      (let ((doom--prefer-theme-elc t))
+        (load-theme doom-theme t)))))
 
 
 ;;
@@ -516,20 +497,20 @@ frames, however. There's always `doom/reload-theme' if you need it!"
   (add-to-list 'kill-buffer-query-functions #'doom|protect-fallback-buffer nil 'eq)
   (add-hook 'after-change-major-mode-hook #'doom|highlight-non-default-indentation)
 
-  ;; Reload theme if the display device has changed
-  (add-hook 'after-make-frame-functions #'doom|reload-theme-in-frame-maybe)
-  (add-hook 'after-delete-frame-functions #'doom|reload-theme-maybe)
-
   ;; Initialize custom switch-{buffer,window,frame} hooks:
   ;; + `doom-switch-buffer-hook'
   ;; + `doom-switch-window-hook'
   ;; + `doom-switch-frame-hook'
   (add-hook 'buffer-list-update-hook #'doom|run-switch-window-hooks)
   (add-hook 'focus-in-hook #'doom|run-switch-frame-hooks)
-  (advice-add! '(switch-to-buffer display-buffer) :around #'doom*run-switch-buffer-hooks))
+  (advice-add! '(switch-to-next-buffer switch-to-prev-buffer)
+               :around #'doom*run-switch-to-next-prev-buffer-hooks)
+  (advice-add! '(switch-to-buffer display-buffer)
+               :around #'doom*run-switch-buffer-hooks))
 
 ;; Apply `doom-theme'
-(unless (daemonp)
+(if (daemonp)
+    (add-hook 'after-make-frame-functions #'doom|init-theme)
   (add-hook 'doom-init-ui-hook #'doom|init-theme))
 ;; Apply `doom-font' et co
 (add-hook 'doom-after-init-modules-hook #'doom|init-fonts)
