@@ -94,18 +94,6 @@ This can be passed nil as its second argument to unset handlers for MODES. e.g.
       (put fn '+lookup-async (or (plist-get plist :async) async))
       (add-hook functions-var fn nil t))))
 
-(defun +lookup--symbol-or-region (&optional initial)
-  "Grab the symbol at point or selected region."
-  (cond ((stringp initial)
-         initial)
-        ((use-region-p)
-         (buffer-substring-no-properties (region-beginning)
-                                         (region-end)))
-        ((require 'xref nil t)
-         ;; A little smarter than using `symbol-at-point', though in most cases,
-         ;; xref ends up using `symbol-at-point' anyway.
-         (xref-backend-identifier-at-point (xref-find-backend)))))
-
 (defun +lookup--run-handler (handler identifier)
   (if (commandp handler)
       (call-interactively handler)
@@ -113,9 +101,9 @@ This can be passed nil as its second argument to unset handlers for MODES. e.g.
 
 (defun +lookup--run-handlers (handler identifier origin)
   (doom-log "Looking up '%s' with '%s'" identifier handler)
-  (condition-case e
+  (condition-case-unless-debug e
       (let ((wconf (current-window-configuration))
-            (result (condition-case e
+            (result (condition-case-unless-debug e
                         (+lookup--run-handler handler identifier)
                       (error
                        (doom-log "Lookup handler %S threw an error: %s" handler e)
@@ -130,22 +118,28 @@ This can be passed nil as its second argument to unset handlers for MODES. e.g.
                    (/= (point-marker) origin))
                (prog1 (point-marker)
                  (set-window-configuration wconf)))))
-    ((error user-error debug)
+    ((error user-error)
      (message "Lookup handler %S: %s" handler e)
      nil)))
 
-(defun +lookup--jump-to (prop identifier &optional display-fn)
+(defun +lookup--jump-to (prop identifier &optional display-fn arg)
   (let* ((origin (point-marker))
+         (handlers (plist-get (list :definition '+lookup-definition-functions
+                                    :references '+lookup-references-functions
+                                    :documentation '+lookup-documentation-functions
+                                    :file '+lookup-file-functions)
+                              prop))
          (result
-          (run-hook-wrapped
-           (plist-get (list :definition '+lookup-definition-functions
-                            :references '+lookup-references-functions
-                            :documentation '+lookup-documentation-functions
-                            :file '+lookup-file-functions)
-                      prop)
-           #'+lookup--run-handlers
-           identifier
-           origin)))
+          (if arg
+              (if-let*
+                  ((handler (intern-soft
+                             (completing-read "Select lookup handler: "
+                                              (remq t (append (symbol-value handlers)
+                                                              (default-value handlers)))
+                                              nil t))))
+                  (+lookup--run-handlers handler identifier origin)
+                (user-error "No lookup handler selected"))
+            (run-hook-wrapped handlers #'+lookup--run-handlers identifier origin))))
     (when (cond ((null result)
                  (message "No lookup handler could find %S" identifier)
                  nil)
@@ -158,6 +152,19 @@ This can be passed nil as its second argument to unset handlers for MODES. e.g.
       (with-current-buffer (marker-buffer origin)
         (better-jumper-set-jump (marker-position origin)))
       result)))
+
+;;;###autoload
+(defun +lookup-symbol-or-region (&optional initial)
+  "Grab the symbol at point or selected region."
+  (cond ((stringp initial)
+         initial)
+        ((use-region-p)
+         (buffer-substring-no-properties (region-beginning)
+                                         (region-end)))
+        ((require 'xref nil t)
+         ;; A little smarter than using `symbol-at-point', though in most cases,
+         ;; xref ends up using `symbol-at-point' anyway.
+         (xref-backend-identifier-at-point (xref-find-backend)))))
 
 
 ;;
@@ -219,57 +226,47 @@ current buffer."
              (not (and (>= pt beg)
                        (<  pt end))))))))
 
-(defun +lookup-dash-docsets-backend (identifier)
-  "Looks up IDENTIFIER in available Dash docsets, if any are installed.
-
-Docsets must be installed with `+lookup/install-docset'. These can also be
-accessed via `+lookup/in-docsets'."
-  (and (featurep! +docsets)
-       (or (require 'counsel-dash nil t)
-           (require 'helm-dash nil t))
-       (let ((docsets (+lookup-docsets-for-buffer)))
-         (when (cl-some #'+lookup-docset-installed-p docsets)
-           (+lookup/in-docsets identifier docsets)
-           'deferred))))
-
 
 ;;
 ;;; Main commands
 
 ;;;###autoload
-(defun +lookup/definition (identifier)
+(defun +lookup/definition (identifier &optional arg)
   "Jump to the definition of IDENTIFIER (defaults to the symbol at point).
 
 Each function in `+lookup-definition-functions' is tried until one changes the
 point or current buffer. Falls back to dumb-jump, naive
 ripgrep/the_silver_searcher text search, then `evil-goto-definition' if
 evil-mode is active."
-  (interactive (list (+lookup--symbol-or-region)))
+  (interactive (list (+lookup-symbol-or-region)
+                     current-prefix-arg))
   (cond ((null identifier) (user-error "Nothing under point"))
-        ((+lookup--jump-to :definition identifier))
+        ((+lookup--jump-to :definition identifier nil arg))
         ((error "Couldn't find the definition of %S" identifier))))
 
 ;;;###autoload
-(defun +lookup/references (identifier)
+(defun +lookup/references (identifier &optional arg)
   "Show a list of usages of IDENTIFIER (defaults to the symbol at point)
 
 Tries each function in `+lookup-references-functions' until one changes the
 point and/or current buffer. Falls back to a naive ripgrep/the_silver_searcher
 search otherwise."
-  (interactive (list (+lookup--symbol-or-region)))
+  (interactive (list (+lookup-symbol-or-region)
+                     current-prefix-arg))
   (cond ((null identifier) (user-error "Nothing under point"))
-        ((+lookup--jump-to :references identifier))
+        ((+lookup--jump-to :references identifier nil arg))
         ((error "Couldn't find references of %S" identifier))))
 
 ;;;###autoload
-(defun +lookup/documentation (identifier)
+(defun +lookup/documentation (identifier &optional arg)
   "Show documentation for IDENTIFIER (defaults to symbol at point or selection.
 
 First attempts the :documentation handler specified with `set-lookup-handlers!'
 for the current mode/buffer (if any), then falls back to the backends in
 `+lookup-documentation-functions'."
-  (interactive (list (+lookup--symbol-or-region)))
-  (cond ((+lookup--jump-to :documentation identifier 'pop-to-buffer))
+  (interactive (list (+lookup-symbol-or-region)
+                     current-prefix-arg))
+  (cond ((+lookup--jump-to :documentation identifier #'pop-to-buffer arg))
         ((user-error "Couldn't find documentation for %S" identifier))))
 
 (defvar ffap-file-finder)
@@ -288,7 +285,7 @@ Otherwise, falls back on `find-file-at-point'."
       (or (ffap-guesser)
           (ffap-read-file-or-url
            (if ffap-url-regexp "Find file or URL: " "Find file: ")
-           (+lookup--symbol-or-region))))))
+           (+lookup-symbol-or-region))))))
   (require 'ffap)
   (cond ((not path)
          (call-interactively #'find-file-at-point))
@@ -336,7 +333,7 @@ DOCSETS is a list of docset strings. Docsets can be installed with
                 (or (bound-and-true-p counsel-dash-docsets)
                     (bound-and-true-p helm-dash-docsets)))))
          (helm-dash-docsets counsel-dash-docsets)
-         (query (or query (+lookup--symbol-or-region) "")))
+         (query (or query (+lookup-symbol-or-region) "")))
     (cond ((featurep! :completion helm)
            (helm-dash query))
           ((featurep! :completion ivy)

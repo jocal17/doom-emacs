@@ -50,15 +50,16 @@ This is used by `associate!', `file-exists-p!' and `project-file-exists-p!'."
 (defun doom--resolve-hook-forms (hooks)
   "Converts a list of modes into a list of hook symbols.
 
-If a mode is quoted, it is left as is."
+If a mode is quoted, it is left as is. If the entire HOOKS list is quoted, the
+list is returned as-is."
   (declare (pure t) (side-effect-free t))
-  (cl-loop with quoted-p = (eq (car-safe hooks) 'quote)
-           for hook in (doom-enlist (doom-unquote hooks))
-           if (eq (car-safe hook) 'quote)
-            collect (cadr hook)
-           else if quoted-p
-            collect hook
-           else collect (intern (format "%s-hook" (symbol-name hook)))))
+  (let ((hook-list (doom-enlist (doom-unquote hooks))))
+    (if (eq (car-safe hooks) 'quote)
+        hook-list
+      (cl-loop for hook in hook-list
+               if (eq (car-safe hook) 'quote)
+               collect (cadr hook)
+               else collect (intern (format "%s-hook" (symbol-name hook)))))))
 
 (defun doom--assert-stage-p (stage macro)
   (unless (bound-and-true-p byte-compile-current-file)
@@ -107,13 +108,13 @@ Accepts the same arguments as `message'."
      (let ((inhibit-message (active-minibuffer-window)))
        (message
         ,(concat (propertize "DOOM " 'face 'font-lock-comment-face)
-                 format-string
                  (when doom--current-module
                    (propertize
-                    (format " [%s/%s]"
+                    (format "[%s/%s] "
                             (doom-keyword-name (car doom--current-module))
                             (cdr doom--current-module))
-                    'face 'warning)))
+                    'face 'warning))
+                 format-string)
         ,@args))))
 
 (defun FILE! ()
@@ -318,13 +319,24 @@ If N and M = 1, there's no benefit to using this macro over `remove-hook'.
   (declare (indent 1))
   (unless (= 0 (% (length rest) 2))
     (signal 'wrong-number-of-arguments (list #'evenp (length rest))))
-  `(add-hook! :append ,hooks
-     ,@(let (forms)
-         (while rest
-           (let ((var (pop rest))
-                 (val (pop rest)))
-             (push `(setq-local ,var ,val) forms)))
-         (nreverse forms))))
+  (let* ((vars (let ((args rest)
+                     vars)
+                 (while args
+                   (push (symbol-name (car args)) vars)
+                   (setq args (cddr args)))
+                 vars))
+         (fnsym (intern (format "doom|setq-%s" (string-join (sort vars #'string-lessp) "-")))))
+    (macroexp-progn
+     (append `((fset ',fnsym
+                     (lambda (&rest _)
+                       ,@(let (forms)
+                           (while rest
+                             (let ((var (pop rest))
+                                   (val (pop rest)))
+                               (push `(set (make-local-variable ',var) ,val) forms)))
+                           (nreverse forms)))))
+             (cl-loop for hook in (doom--resolve-hook-forms hooks)
+                      collect `(add-hook ',hook #',fnsym 'append))))))
 
 (defun advice-add! (symbols where functions)
   "Variadic version of `advice-add'.
@@ -443,6 +455,49 @@ If NOERROR is non-nil, don't throw an error if the file doesn't exist."
                          (concat source ".el")
                          (cdr err))
                         e)))))))
+
+(defmacro custom-set-faces! (&rest spec-groups)
+  "Convenience macro for additively setting face attributes.
+
+SPEC-GROUPS is a list of either face specs, or alists mapping a package name to
+a list of face specs. e.g.
+
+  (custom-set-faces!
+   (mode-line :foreground (doom-color 'blue))
+   (mode-line-buffer-id :foreground (doom-color 'fg) :background \"#000000\")
+   (mode-line-success-highlight :background (doom-color 'green))
+   (org
+    (org-tag :background \"#4499FF\")
+    (org-ellipsis :inherit 'org-tag))
+   (which-key
+    (which-key-docstring-face :inherit 'font-lock-comment-face)))
+
+Each face spec must be in the format of (FACE-NAME [:ATTRIBUTE VALUE]...).
+
+Unlike `custom-set-faces', which destructively changes a face's spec, this one
+adjusts pre-existing ones."
+  `(add-hook
+    'doom-load-theme-hook
+    (let ((fn (make-symbol "doom|init-custom-faces")))
+      (fset fn
+            (lambda ()
+              ,@(let (forms)
+                  (dolist (spec-group spec-groups)
+                    (if (keywordp (cadr spec-group))
+                        (cl-destructuring-bind (face . attrs) spec-group
+                          (push `(set-face-attribute ,(if (symbolp face) `(quote ,face) face)
+                                                     nil ,@attrs)
+                                forms))
+                      (let ((package (car spec-group))
+                            (specs (cdr spec-group)))
+                        (push `(after! ,package
+                                 ,@(cl-loop for (face . attrs) in specs
+                                            collect `(set-face-attribute ,(if (symbolp face) `(quote ,face) face)
+                                                                         nil ,@attrs)))
+                              forms))))
+                  (nreverse forms))))
+      fn)
+    'append))
 
 (provide 'core-lib)
 ;;; core-lib.el ends here

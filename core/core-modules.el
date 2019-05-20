@@ -25,9 +25,13 @@
               (eval (:tools eval))
               (lookup (:tools lookup))
               (debugger (:tools debugger)))
-    (:tools (rotate-text (:editor rotate-text)))
+    (:tools (rotate-text (:editor rotate-text))
+            (vterm (:term vterm))
+            (password-store (:tools pass)))
     (:emacs (electric-indent (:emacs electric))
-            (hideshow (:editor fold)))
+            (hideshow (:editor fold))
+            (eshell (:term eshell))
+            (term (:term term)))
     (:ui (doom-modeline (:ui modeline))
          (fci (:ui fill-column))
          (evil-goggles (:ui ophints)))
@@ -220,12 +224,13 @@ non-nil, return paths of possible modules, activated or otherwise."
 ;;
 ;;; Use-package modifications
 
-(autoload 'use-package "use-package-core" nil nil t)
+(eval-and-compile
+  (autoload 'use-package "use-package-core" nil nil t)
 
-(setq use-package-compute-statistics doom-debug-mode
-      use-package-verbose doom-debug-mode
-      use-package-minimum-reported-time (if doom-debug-mode 0 0.1)
-      use-package-expand-minimally (not noninteractive))
+  (setq use-package-compute-statistics doom-debug-mode
+        use-package-verbose doom-debug-mode
+        use-package-minimum-reported-time (if doom-debug-mode 0 0.1)
+        use-package-expand-minimally (not noninteractive)))
 
 ;; Adds two new keywords to `use-package' (and consequently, `def-package!') to
 ;; expand its lazy-loading capabilities. They are:

@@ -10,7 +10,7 @@
 
 (after! notmuch
   (set-company-backend! 'notmuch-message-mode
-    '(notmuch-company (company-ispell :with company-yasnippet)))
+    '(notmuch-company :with company-ispell company-yasnippet))
 
   (set-popup-rule! "^\\*notmuch-hello" :side 'left :size 30 :ttl 0)
 
@@ -45,12 +45,6 @@
   (add-to-list 'doom-real-buffer-functions #'notmuch-interesting-buffer nil #'eq)
 
   (advice-add #'notmuch-start-notmuch-sentinel :around #'+notmuch*dont-confirm-on-kill-process)
-
-  ;; Visual enhancements
-  (defun +notmuch|center-window ()
-    (setq-local visual-fill-column-width 90)
-    (visual-fill-column-mode))
-  (add-hook 'notmuch-show-mode-hook #'+notmuch|center-window)
 
   ;; modeline doesn't have much use in these modes
   (add-hook! (notmuch-show-mode notmuch-tree-mode notmuch-search-mode)

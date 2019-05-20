@@ -5,6 +5,7 @@
 - [[#ui][:ui]]
 - [[#editor][:editor]]
 - [[#emacs][:emacs]]
+- [[#term][:term]]
 - [[#tools][:tools]]
 - [[#lang][:lang]]
 - [[#email][:email]]
@@ -63,17 +64,22 @@ Modules that reconfigure or augment packages or features built into Emacs.
 
 + dired =+ranger +icons=:
 + electric:
-+ eshell:
 + imenu:
-+ term:
 + vc:
+
+* :term
+Modules that offer terminal emulation.
+
++ eshell:
++ term:
++ [[file:term/vterm/README.org][vterm]]:
 
 * :tools
 Small modules that give Emacs access to external tools & services.
 
 + ansible:
 + debugger: A (nigh-)universal debugger in Emacs
-+ docker:
++ [[file:tools/docker/README.org][docker]]:
 + [[file:tools/editorconfig/README.org][editorconfig]]:
 + [[file:tools/ein/README.org][ein]]:
 + [[file:tools/eval/README.org][eval]]: REPL & code evaluation support for a variety of languages
@@ -85,7 +91,7 @@ Small modules that give Emacs access to external tools & services.
 + macos:
 + magit:
 + make:
-+ password-store:
++ pass:
 + pdf:
 + prodigy:
 + rgb:
@@ -93,7 +99,6 @@ Small modules that give Emacs access to external tools & services.
 + tmux:
 + upload:
 + [[file:tools/wakatime/README.org][wakatime]]:
-+ vterm:
 
 * :lang
 Modules that bring support for a language or group of languages to Emacs.
@@ -155,7 +160,7 @@ Modules that bring support for a language or group of languages to Emacs.
 Large, opinionated modules that transform and take over Emacs, i.e.
 Doom-specific porcelains.
 
-+ calendar:
++ [[file:app/calendar/README.org][calendar]]:
 + [[file:app/irc/README.org][irc]]:
 + rss =+org=:
 + twitter:

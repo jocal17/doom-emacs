@@ -9,7 +9,7 @@ line with a linewise comment.")
 
 ;; Set these defaults before `evil'; use `defvar' so they can be changed prior
 ;; to loading.
-(defvar evil-want-C-i-jump (display-graphic-p))
+(defvar evil-want-C-i-jump (or (daemonp) (display-graphic-p)))
 (defvar evil-want-C-u-scroll t)
 (defvar evil-want-C-w-scroll t)
 (defvar evil-want-Y-yank-to-eol t)
@@ -44,6 +44,9 @@ line with a linewise comment.")
 
   (put 'evil-define-key* 'lisp-indent-function 'defun)
 
+  ;; Start help-with-tutorial in emacs state
+  (advice-add #'help-with-tutorial :after (lambda (&rest _) (evil-emacs-state +1)))
+
   ;; Done in a hook to ensure the popup rules load as late as possible
   (defun +evil|init-popup-rules ()
     (set-popup-rules!
@@ -51,17 +54,21 @@ line with a linewise comment.")
         ("^\\*Command Line"   :size 8))))
   (add-hook 'doom-init-modules-hook #'+evil|init-popup-rules)
 
-  ;; Change the cursor color in emacs mode
-  (defvar +evil--default-cursor-color
-    (or (ignore-errors (frame-parameter nil 'cursor-color))
-        "#ffffff"))
-
-  (defun +evil-default-cursor () (set-cursor-color +evil--default-cursor-color))
-  (defun +evil-emacs-cursor ()   (set-cursor-color (face-foreground 'warning)))
+  ;; Change the cursor color in emacs state. We do it this roundabout way
+  ;; instead of changing `evil-default-cursor' (or `evil-emacs-state-cursor') so
+  ;; it won't interfere with users who have changed these variables.
+  (defvar +evil--default-cursor-color "#ffffff")
+  (defvar +evil--emacs-cursor-color "#ff9999")
 
   (defun +evil|update-cursor-color ()
-    (setq +evil--default-cursor-color (face-background 'cursor)))
+    (setq +evil--default-cursor-color (face-background 'cursor)
+          +evil--emacs-cursor-color (face-foreground 'warning)))
   (add-hook 'doom-load-theme-hook #'+evil|update-cursor-color)
+
+  (defun +evil-default-cursor ()
+    (evil-set-cursor-color +evil--default-cursor-color))
+  (defun +evil-emacs-cursor ()
+    (evil-set-cursor-color +evil--emacs-cursor-color))
 
   (defun +evil|update-shift-width ()
     (setq evil-shift-width tab-width))
@@ -148,7 +155,8 @@ line with a linewise comment.")
    '+evil:align :move-point t :ex-arg 'buffer-match :ex-bang t :keep-visual t :suppress-operator t)
 
   ;; `evil-collection'
-  (when (featurep! +everywhere)
+  (when (and (featurep! +everywhere)
+             (not doom-reloading-p))
     (load! "+everywhere"))
 
   ;; Custom evil ex commands

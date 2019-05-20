@@ -1,7 +1,5 @@
 ;;; ui/modeline/config.el -*- lexical-binding: t; -*-
 
-;; TODO Add themes (default, minimal, spacemacs, etc)
-
 (def-package! doom-modeline
   :hook (after-init . doom-modeline-mode)
   :init
@@ -34,7 +32,7 @@
   (add-hook 'doom-modeline-mode-hook #'size-indication-mode) ; filesize in modeline
   (add-hook 'doom-modeline-mode-hook #'column-number-mode)   ; cursor column in modeline
 
-  (add-hook 'doom-big-font-mode-hook #'+modeline|resize-for-big-font)
+  (add-hook 'doom-change-font-size-hook #'+modeline|resize-for-font)
   (add-hook 'doom-load-theme-hook #'doom-modeline-refresh-bars)
 
   (add-hook '+doom-dashboard-mode-hook #'doom-modeline-set-project-modeline)
@@ -84,4 +82,4 @@
 
 (def-package! evil-anzu
   :when (featurep! :editor evil)
-  :after-call (evil-ex-start-search evil-ex-start-word-search))
+  :after-call (evil-ex-start-search evil-ex-start-word-search evil-ex-search-activate-highlight))

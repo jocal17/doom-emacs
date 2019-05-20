@@ -163,7 +163,7 @@ Doom was setup, which may cause problems.")
   (setq selection-coding-system 'utf-8))  ; with sugar on top
 
 (setq-default
- ad-redefinition-action 'accept   ; silence advised function warnings
+ ad-redefinition-action 'accept   ; silence redefined function warnings
  apropos-do-all t                 ; make `apropos' more useful
  auto-mode-case-fold nil
  autoload-compute-prefixes nil
@@ -171,7 +171,7 @@ Doom was setup, which may cause problems.")
  jka-compr-verbose doom-debug-mode ; silence compression messages
  ffap-machine-p-known 'reject     ; don't ping things that look like domain names
  find-file-visit-truename t       ; resolve symlinks when opening files
- idle-update-delay 2              ; update ui less often
+ idle-update-delay 1              ; update ui slightly less often
  ;; be quiet at startup; don't load or display anything unnecessary
  inhibit-startup-message t
  inhibit-startup-echo-area-message user-login-name
@@ -196,7 +196,7 @@ Doom was setup, which may cause problems.")
  ;; Don't store authinfo in plain text!
  auth-sources (list (expand-file-name "authinfo.gpg" doom-etc-dir)
                     "~/.authinfo.gpg")
- ;; files
+ ;; Don't litter `doom-emacs-dir'
  abbrev-file-name             (concat doom-local-dir "abbrev.el")
  async-byte-compile-log-file  (concat doom-etc-dir "async-bytecomp.log")
  auto-save-list-file-name     (concat doom-cache-dir "autosave")
@@ -211,9 +211,21 @@ Doom was setup, which may cause problems.")
  tramp-auto-save-directory    (concat doom-cache-dir "tramp-auto-save/")
  tramp-backup-directory-alist backup-directory-alist
  tramp-persistency-file-name  (concat doom-cache-dir "tramp-persistency.el")
+ tutorial--saved-dir          (concat doom-cache-dir "tutorial/")
  url-cache-directory          (concat doom-cache-dir "url/")
  url-configuration-directory  (concat doom-etc-dir "url/")
  gamegrid-user-score-file-directory (concat doom-etc-dir "games/"))
+
+(defun doom*symbol-file (orig-fn symbol &optional type)
+  "If a `doom-file' symbol property exists on SYMBOL, use that instead of the
+original value of `symbol-file'."
+  (or (if (symbolp symbol) (get symbol 'doom-file))
+      (funcall orig-fn symbol type)))
+(advice-add #'symbol-file :around #'doom*symbol-file)
+
+
+;;
+;;; Minor mode version of `auto-mode-alist'
 
 (defvar doom-auto-minor-mode-alist '()
   "Alist mapping filename patterns to corresponding minor mode functions, like
@@ -238,22 +250,9 @@ enable multiple minor modes for the same regexp.")
         (setq alist (cdr alist))))))
 (add-hook 'find-file-hook #'doom|enable-minor-mode-maybe)
 
-(defun doom*symbol-file (orig-fn symbol &optional type)
-  "If a `doom-file' symbol property exists on SYMBOL, use that instead of the
-original value of `symbol-file'."
-  (or (if (symbolp symbol) (get symbol 'doom-file))
-      (funcall orig-fn symbol type)))
-(advice-add #'symbol-file :around #'doom*symbol-file)
 
-;; To speed up minibuffer commands (like helm and ivy), defer garbage collection
-;; when the minibuffer is active. It may mean a pause when finished, but that's
-;; acceptable instead of pauses during.
-(defun doom|defer-garbage-collection ()
-  (setq gc-cons-threshold doom-gc-cons-upper-limit))
-(defun doom|restore-garbage-collection ()
-  (setq gc-cons-threshold doom-gc-cons-threshold))
-(add-hook 'minibuffer-setup-hook #'doom|defer-garbage-collection)
-(add-hook 'minibuffer-exit-hook  #'doom|restore-garbage-collection)
+;;
+;;; MODE-local-vars-hook
 
 ;; File+dir local variables are initialized after the major mode and its hooks
 ;; have run. If you want hook functions to be aware of these customizations, add
@@ -271,6 +270,14 @@ original value of `symbol-file'."
   (unless enable-local-variables
     (doom|run-local-var-hooks)))
 (add-hook 'after-change-major-mode-hook #'doom|run-local-var-hooks-if-necessary)
+
+(defun doom|create-non-existent-directories ()
+  "Automatically create missing directories when creating new files."
+  (let ((parent-directory (file-name-directory buffer-file-name)))
+    (when (and (not (file-exists-p parent-directory))
+               (y-or-n-p (format "Directory `%s' does not exist! Create it?" parent-directory)))
+      (make-directory parent-directory t))))
+(add-hook 'find-file-not-found-functions #'doom|create-non-existent-directories)
 
 
 ;;
@@ -317,7 +324,8 @@ intervals."
           (when req
             (doom-log "Incrementally loading %s" req)
             (condition-case e
-                (require req nil t)
+                (or (while-no-input (require req nil t) t)
+                    (push req reqs))
               ((error debug)
                (message "Failed to load '%s' package incrementally, because: %s"
                         req e)))
@@ -420,6 +428,23 @@ in interactive sessions, nil otherwise (but logs a warning)."
          (message "Autoload file warning: %s -> %s" (car e) (error-message-string e))
        (signal 'doom-autoload-error (list (file-name-nondirectory file) e))))))
 
+(defun doom-load-env-vars (file)
+  "Read and set envvars in FILE."
+  (let (vars)
+    (with-temp-buffer
+      (insert-file-contents file)
+      (re-search-forward "\n\n" nil t)
+      (while (re-search-forward "\n\\([^= \n]+\\)=" nil t)
+        (save-excursion
+          (let ((var (match-string 1))
+                (value (buffer-substring-no-properties
+                        (point)
+                        (1- (or (when (re-search-forward "^\\([^= ]+\\)=" nil t)
+                                  (line-beginning-position))
+                                (point-max))))))
+            (setenv var value)))))
+    vars))
+
 (defun doom-initialize (&optional force-p)
   "Bootstrap Doom, if it hasn't already (or if FORCE-P is non-nil).
 
@@ -484,9 +509,8 @@ to least)."
 
     ;; Load shell environment
     (when (and (not noninteractive)
-               (file-readable-p doom-env-file)
-               (require 'load-env-vars nil t))
-      (load-env-vars doom-env-file)
+               (file-readable-p doom-env-file))
+      (doom-load-env-vars doom-env-file)
       (setq exec-path (append (split-string (getenv "PATH") ":")
                               (list exec-directory))
             shell-file-name (or (getenv "SHELL")

@@ -62,6 +62,22 @@ immediately runs it on the current candidate (ending the ivy session)."
         ;; enable ability to select prompt (alternative to `ivy-immediate-done')
         ivy-use-selectable-prompt t)
 
+  ;; Ensure a jump point is registered before jumping to new locations with ivy
+  (defvar +ivy--origin nil)
+
+  (defun +ivy|record-position-maybe ()
+    (with-ivy-window
+      (setq +ivy--origin (point-marker))))
+  (setq ivy-hooks-alist '((t . +ivy|record-position-maybe)))
+
+  (defun +ivy|set-jump-point-maybe ()
+    (when (and (markerp +ivy--origin)
+               (not (equal (with-ivy-window (point-marker)) +ivy--origin)))
+      (with-current-buffer (marker-buffer +ivy--origin)
+        (better-jumper-set-jump +ivy--origin)))
+    (setq +ivy--origin nil))
+  (add-hook 'minibuffer-exit-hook #'+ivy|set-jump-point-maybe)
+
   (after! yasnippet
     (add-to-list 'yas-prompt-functions #'+ivy-yas-prompt nil #'eq))
 
@@ -92,6 +108,15 @@ immediately runs it on the current candidate (ending the ivy session)."
                 (cadr (plist-get ivy-rich-display-transformers-list
                                  'ivy-switch-buffer))))
 
+  ;; Include variable value in `counsel-describe-variable'
+  (setq ivy-rich-display-transformers-list
+        (plist-put ivy-rich-display-transformers-list
+                   'counsel-describe-variable
+                   '(:columns
+                     ((counsel-describe-variable-transformer (:width 40)) ; the original transformer
+                      (+ivy-rich-describe-variable-transformer (:width 50))
+                      (ivy-rich-counsel-variable-docstring (:face font-lock-doc-face))))))
+
   ;; Remove built-in coloring of buffer list; we do our own
   (setq ivy-switch-buffer-faces-alist nil)
   (ivy-set-display-transformer 'internal-complete-buffer nil)
@@ -103,12 +128,11 @@ immediately runs it on the current candidate (ending the ivy session)."
     (when switch-buffer-alist
       (setcar switch-buffer-alist '+ivy-rich-buffer-name)))
 
-  ;; Allow these transformers to apply to more switch-buffer commands
-  (let ((ivy-switch-buffer-transformer (plist-get ivy-rich-display-transformers-list 'ivy-switch-buffer)))
-    (dolist (cmd '(+ivy--switch-buffer counsel-projectile-switch-to-buffer))
-      (setq ivy-rich-display-transformers-list
-            (plist-put ivy-rich-display-transformers-list
-                       cmd ivy-switch-buffer-transformer))))
+  ;; Apply switch buffer transformers to `counsel-projectile-switch-to-buffer' as well
+  (setq ivy-rich-display-transformers-list
+        (plist-put ivy-rich-display-transformers-list
+                   'counsel-projectile-switch-to-buffer
+                   (plist-get ivy-rich-display-transformers-list 'ivy-switch-buffer)))
 
   ;; Reload ivy which so changes to `ivy-rich-display-transformers-list' work
   (ivy-rich-mode +1))

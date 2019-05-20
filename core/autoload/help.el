@@ -121,42 +121,52 @@ selection of all minor-modes, active or not."
 ;;
 ;;; Documentation commands
 
-(defun doom--org-headings (files &optional depth _prompt include-files)
+(defun doom--org-headings (files &optional depth include-files)
+  "TODO"
   (require 'org)
-  (let ((org-agenda-files (doom-enlist files))
-        (default-directory doom-docs-dir))
+  (let* ((default-directory doom-docs-dir)
+         (org-agenda-files (mapcar #'expand-file-name (doom-enlist files)))
+         (depth (if (integerp depth) depth)))
     (unwind-protect
         (delq nil
               (org-map-entries
                (lambda ()
-                 (let* ((components (org-heading-components))
-                        (path (org-get-outline-path))
-                        (level (nth 0 components))
-                        (text (nth 4 components))
-                        (tags (nth 5 components)))
-                   (when (and (or (not depth)
-                                  (and (integerp depth)
-                                       (<= level depth)))
-                              (or (not tags)
-                                  (not (string-match-p ":TOC" tags))))
-                     (list
-                      (mapconcat
-                       'identity
-                       (list (mapconcat 'identity
-                                        (append (when include-files
-                                                  (list (or (+org-get-property "TITLE")
-                                                            (file-relative-name buffer-file-name))))
-                                                path
-                                                (list text))
-                                        " > ")
-                             tags)
-                       " ")
-                      buffer-file-name
-                      (point)))))
-               nil
-               'agenda))
+                 (cl-destructuring-bind (level _reduced-level _todo _priority text tags)
+                     (org-heading-components)
+                   (let ((path (org-get-outline-path)))
+                     (when (and (or (null depth)
+                                    (<= level depth))
+                                (or (null tags)
+                                    (not (string-match-p ":TOC" tags))))
+                       (propertize
+                        (mapconcat
+                         'identity
+                         (list (mapconcat #'identity
+                                          (append (when include-files
+                                                    (list (or (+org-get-property "TITLE")
+                                                              (file-relative-name buffer-file-name))))
+                                                  path
+                                                  (list text))
+                                          " > ")
+                               tags)
+                         " ")
+                        'location (cons buffer-file-name (point)))))))
+               t 'agenda))
       (mapc #'kill-buffer org-agenda-new-buffers)
       (setq org-agenda-new-buffers nil))))
+
+;;;###autoload
+(defun doom-completing-read-org-headings (prompt files &optional depth include-files initial-input)
+  "TODO"
+  (if-let* ((result (completing-read
+                     prompt
+                     (doom--org-headings files depth include-files)
+                     nil nil initial-input)))
+      (cl-destructuring-bind (file . location)
+          (get-text-property 0 'location result)
+        (find-file file)
+        (goto-char location))
+    (user-error "Aborted")))
 
 ;;;###autoload
 (defun doom/help ()
@@ -165,24 +175,27 @@ selection of all minor-modes, active or not."
   (find-file (expand-file-name "index.org" doom-docs-dir)))
 
 ;;;###autoload
-(defun doom/help-search ()
+(defun doom/help-search (&optional initial-input)
   "Search Doom's documentation and jump to a headline."
   (interactive)
   (let (ivy-sort-functions-alist)
-    (completing-read "Find in Doom help: "
-                     (doom--org-headings (list "getting_started.org"
-                                               "contributing.org"
-                                               "troubleshooting.org"
-                                               "tutorials.org"
-                                               "faq.org")
-                                         2 nil t))))
+    (doom-completing-read-org-headings
+      "Find in Doom help: "
+      (list "getting_started.org"
+            "contributing.org"
+            "troubleshooting.org"
+            "tutorials.org"
+            "faq.org"
+            "../modules/README.org")
+      2 t initial-input)))
 
 ;;;###autoload
-(defun doom/help-faq ()
+(defun doom/help-faq (&optional initial-input)
   "Search Doom's FAQ and jump to a question."
   (interactive)
-  (completing-read "Find in FAQ: "
-                   (doom--org-headings (list "faq.org"))))
+  (doom-completing-read-org-headings
+   "Find in FAQ: " (list "faq.org")
+   nil nil initial-input))
 
 ;;;###autoload
 (defun doom/help-news ()
@@ -442,11 +455,12 @@ If prefix arg is present, refresh the cache."
               (cl-destructuring-bind (file line _match)
                   ,(split-string location ":")
                 (find-file (expand-file-name file doom-emacs-dir))
-                (goto-line (string-to-number line))
+                (goto-char (point-min))
+                (forward-line (1- line))
                 (recenter)))))))))
 
 ;;;###autoload
-(defun doom/help-package-config (package &optional arg)
+(defun doom/help-package-config (package)
   "Jump to any `def-package!', `after!' or ;;;###package block for PACKAGE.
 
 This only searches `doom-emacs-dir' (typically ~/.emacs.d) and does not include
@@ -477,5 +491,6 @@ config blocks in your private config."
             (user-error "This package isn't configured by you or Doom")))
        ":")
     (find-file (expand-file-name file doom-emacs-dir))
-    (goto-line (string-to-number line))
+    (goto-char (point-min))
+    (forward-line (1- line))
     (recenter)))

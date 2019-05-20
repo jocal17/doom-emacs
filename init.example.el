@@ -8,7 +8,11 @@
 ;; More information about these modules (and what flags they support) can be
 ;; found in modules/README.org.
 
-(doom! :completion
+(doom! :input
+       ;;chinese
+       ;;japanese
+
+       :completion
        company           ; the ultimate code completion backend
        ;;helm              ; the *other* search engine for love and life
        ;;ido               ; the other *other* search engine...
@@ -55,10 +59,12 @@
        ;;+icons          ; colorful icons for dired-mode
         )
        electric          ; smarter, keyword-based electric-indent
-       ;;eshell            ; a consistent, cross-platform shell (WIP)
-       imenu             ; an imenu sidebar and searchable code index
-       ;;term              ; terminals in Emacs
        vc                ; version-control and Emacs, sitting in a tree
+
+       :term
+       ;;eshell            ; a consistent, cross-platform shell (WIP)
+       ;;term              ; terminals in Emacs
+       ;;vterm             ; another terminals in Emacs
 
        :tools
        ;;ansible
@@ -77,7 +83,7 @@
        ;;macos             ; MacOS-specific commands
        magit             ; a git porcelain for Emacs
        ;;make              ; run make tasks from Emacs
-       ;;password-store    ; password manager for nerds
+       ;;pass              ; password manager for nerds
        ;;pdf               ; pdf enhancements
        ;;prodigy           ; FIXME managing external services & code builders
        ;;rgb               ; creating color strings
@@ -85,7 +91,6 @@
        ;;tmux              ; an API for interacting with tmux
        ;;upload            ; map local to remote projects via ssh/ftp
        ;;wakatime
-       ;;vterm             ; another terminals in Emacs
 
        :lang
        ;;agda              ; types of types of types of types...
