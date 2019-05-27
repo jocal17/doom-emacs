@@ -161,7 +161,12 @@ localleader prefix."
   "Bind `doom-leader-key' and `doom-leader-alt-key'."
   (let ((map general-override-mode-map))
     (if (not (featurep 'evil))
-        (define-key map (kbd doom-leader-alt-key) 'doom/leader)
+        (progn
+          (cond ((equal doom-leader-alt-key "C-c")
+                 (set-keymap-parent doom-leader-map mode-specific-map))
+                ((equal doom-leader-alt-key "C-x")
+                 (set-keymap-parent doom-leader-map ctl-x-map)))
+          (define-key map (kbd doom-leader-alt-key) 'doom/leader))
       (evil-define-key* '(normal visual motion) map (kbd doom-leader-key) 'doom/leader)
       (evil-define-key* '(emacs insert) map (kbd doom-leader-alt-key) 'doom/leader))
     (general-override-mode +1)))
@@ -280,13 +285,12 @@ For example, :nvi will map to (list 'normal 'visual 'insert). See
                   (cl-destructuring-bind (prefix . desc)
                       (doom-enlist (pop rest))
                     (let ((keymap (intern (format "doom-leader-%s-map" desc))))
-                      (push `(progn
-                               (defvar ,keymap (make-sparse-keymap))
-                               (map! :leader
-                                     :desc ,desc ,prefix ,keymap
-                                     :prefix ,prefix ,@rest))
-                            doom--map-forms)
-                      (setq rest nil))))
+                      (setq rest
+                            (append (list :desc desc prefix keymap
+                                          :prefix prefix)
+                                    rest))
+                      (push `(defvar ,keymap (make-sparse-keymap))
+                            doom--map-forms))))
                  (:prefix
                   (cl-destructuring-bind (prefix . desc)
                       (doom-enlist (pop rest))

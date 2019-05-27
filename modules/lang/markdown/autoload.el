@@ -72,14 +72,26 @@ Returns its exit code."
     (call-process-region beg end
                          shell-file-name nil output-buffer nil
                          shell-command-switch
-                         "pandoc" "--smart" "-f" "markdown" "-t" "html")))
+                         "pandoc" "-f" "markdown" "-t" "html"
+                         "--standalone" "--mathjax" "--highlight-style=pygments")))
 
 ;;;###autoload
-(defun +markdown-compile-markdown (beg end output-buffer)
-  "Compiles markdown using the markdown program, if available.
-Returns its exit code."
-  (when (executable-find "markdown")
+(defun +markdown-compile-multimarkdown (beg end output-buffer)
+  "Compiles markdown with the multimarkdown program, if available. Returns its
+exit code."
+  (when (executable-find "multimarkdown")
     (call-process-region beg end
                          shell-file-name nil output-buffer nil
                          shell-command-switch
-                         "markdown")))
+                         "multimarkdown")))
+
+;;;###autoload
+(defun +markdown-compile-markdown (beg end output-buffer)
+  "Compiles markdown using the Markdown.pl script (or markdown executable), if
+available. Returns its exit code."
+  (when-let* ((exe (or (executable-find "Markdown.pl")
+                       (executable-find "markdown"))))
+    (call-process-region beg end
+                         shell-file-name nil output-buffer nil
+                         shell-command-switch
+                         exe)))

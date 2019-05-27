@@ -220,12 +220,7 @@
           :map counsel-ag-map
           "C-SPC"    #'ivy-call-and-recenter ; preview
           "C-l"      #'ivy-done
-          "C-c C-e"  #'+ivy/wgrep-occur      ; search/replace on results
-          [backtab]  #'+ivy/wgrep-occur      ; search/replace on results
-          [C-return] (+ivy-do-action! #'+ivy-git-grep-other-window-action))
-        (:after swiper
-          :map swiper-map
-          [backtab] #'+ivy/wgrep-occur))
+          [C-return] (+ivy-do-action! #'+ivy-git-grep-other-window-action)))
 
       (:when (featurep! :completion helm)
         (:after helm
@@ -249,13 +244,10 @@
             "TAB"      #'helm-execute-persistent-action
             [tab]      #'helm-execute-persistent-action
             "C-z"      #'helm-select-action)
-          (:after swiper-helm
-            :map swiper-helm-keymap [backtab] #'helm-ag-edit)
           (:after helm-ag
             :map helm-ag-map
             "C--"      #'+helm-do-ag-decrease-context
             "C-="      #'+helm-do-ag-increase-context
-            [backtab]  #'helm-ag-edit
             [left]     nil
             [right]    nil)
           (:after helm-files
@@ -579,7 +571,8 @@
         :desc "Previous buffer"             "p"   #'previous-buffer
         :desc "Save buffer"                 "s"   #'save-buffer
         :desc "Sudo edit this file"         "S"   #'doom/sudo-this-file
-        :desc "Pop scratch buffer"          "x"   #'doom/open-scratch-buffer
+        :desc "Pop up scratch buffer"       "x"   #'doom/open-scratch-buffer
+        :desc "Switch to scratch buffer"    "X"   #'doom/switch-to-scratch-buffer
         :desc "Bury buffer"                 "z"   #'bury-buffer)
 
       ;;; <leader> c --- code
@@ -678,12 +671,11 @@
         :desc "Browse notes"                  "." #'+default/browse-notes
         :desc "Search notes"                  "/" #'+default/org-notes-search
         :desc "Search notes for symbol"       "*" #'+default/search-notes-for-symbol-at-point
+        :desc "Org capture"                   "c" #'org-capture
         :desc "Open deft"                     "d" #'deft
         :desc "Search org agenda headlines"   "h" #'+default/org-notes-headlines
         :desc "Find file in notes"            "n" #'+default/find-in-notes
         :desc "Browse notes"                  "N" #'+default/browse-notes
-        :desc "Pop scratch buffer"            "s" #'doom/open-scratch-buffer
-        :desc "Org capture"                   "x" #'org-capture
         :desc "Org store link"                "l" #'org-store-link)
 
       ;;; <leader> o --- open
@@ -737,26 +729,23 @@
       ;;; <leader> p --- project
       (:prefix-map ("p" . "project")
         :desc "Browse project"               "." #'+default/browse-project
-        :desc "Find file in other project"   ">" #'doom/find-file-in-other-project
+        :desc "Browse other project"         ">" #'doom/browse-in-other-project
         :desc "Find file in project"         "/" #'projectile-find-file
-        :desc "Browse other project"         "?" #'doom/browse-in-other-project
+        :desc "Find file in other project"   "?" #'doom/find-file-in-other-project
         :desc "Run cmd in project root"      "!" #'projectile-run-shell-command-in-root
         :desc "Add new project"              "a" #'projectile-add-known-project
         :desc "Switch to project buffer"     "b" #'projectile-switch-to-buffer
         :desc "Compile in project"           "c" #'projectile-compile-project
         :desc "Remove known project"         "d" #'projectile-remove-known-project
-        :desc "Kill project buffers"         "k" #'projectile-kill-buffers
+        :desc "Edit project .dir-locals"     "e" #'projectile-edit-dir-locals
         :desc "Invalidate project cache"     "i" #'projectile-invalidate-cache
+        :desc "Kill project buffers"         "k" #'projectile-kill-buffers
         :desc "Find other file"              "o" #'projectile-find-other-file
         :desc "Switch project"               "p" #'projectile-switch-project
         :desc "Find recent project files"    "r" #'projectile-recentf
-        :desc "Scratch buffer"               "s" #'doom/open-project-scratch-buffer
-        :desc "List project tasks"           "t" #'+default/project-tasks
-        (:prefix ("x" . "terminal")
-          :desc "Open eshell in project"     "e" #'projectile-run-eshell
-          :desc "Open ielm in project"       "i" #'projectile-run-ielm
-          :desc "Open term in project"       "t" #'projectile-run-term
-          :desc "Open shell in project"      "s" #'projectile-run-shell))
+        :desc "Pop up scratch buffer"        "x" #'doom/open-project-scratch-buffer
+        :desc "Switch to scratch buffer"     "X" #'doom/switch-to-project-scratch-buffer
+        :desc "List project tasks"           "t" #'+default/project-tasks)
 
       ;;; <leader> q --- session
       (:prefix-map ("q" . "session")

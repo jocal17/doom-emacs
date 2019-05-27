@@ -26,6 +26,10 @@ If you want to already use git-grep or grep, set this to nil.")
 (defvar +ivy-buffer-unreal-face 'font-lock-comment-face
   "The face for unreal buffers in `ivy-switch-to-buffer'.")
 
+(defvar +ivy-edit-functions nil
+  "A plist mapping ivy/counsel commands to commands that generate an editable
+results buffer.")
+
 (defmacro +ivy-do-action! (action)
   "Returns an interactive lambda that sets the current ivy action and
 immediately runs it on the current candidate (ending the ivy session)."
@@ -84,8 +88,9 @@ immediately runs it on the current candidate (ending the ivy session)."
   (define-key! ivy-mode-map
     [remap switch-to-buffer]              #'+ivy/switch-buffer
     [remap switch-to-buffer-other-window] #'+ivy/switch-buffer-other-window
-    [remap persp-switch-to-buffer]        #'+ivy/switch-workspace-buffer
-    [remap imenu-anywhere]                #'ivy-imenu-anywhere)
+    [remap persp-switch-to-buffer]        #'+ivy/switch-workspace-buffer)
+
+  (define-key ivy-minibuffer-map (kbd "C-c C-e") #'+ivy/woccur)
 
   (ivy-mode +1)
 

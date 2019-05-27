@@ -73,11 +73,27 @@ detected.")
 ;;; Built-in plugins
 
 (def-package! autorevert
-  ;; revert buffers for changed files
-  :after-call after-find-file
+  ;; revert buffers when their files/state have changed
+  :hook (focus-in . doom|auto-revert-buffers)
+  :hook (doom-switch-buffer . auto-revert-handler)
+  :hook (after-save . doom|auto-revert-buffers)
   :config
-  (setq auto-revert-verbose nil)
-  (global-auto-revert-mode +1))
+  (setq auto-revert-verbose t ; let us know when it happens
+        auto-revert-use-notify nil
+        auto-revert-stop-on-user-input nil)
+
+  ;; Instead of using `auto-revert-mode' or `global-auto-revert-mode', we employ
+  ;; lazy auto reverting on `focus-in-hook' and `doom-switch-buffer-hook'.
+  ;;
+  ;; This is because autorevert abuses the heck out of inotify handles which can
+  ;; grind Emacs to a halt if you do expensive IO (outside of Emacs) on the
+  ;; files you have open (like compression). We only really need revert changes
+  ;; when we switch to a buffer or when we focus the Emacs frame.
+  (defun doom|auto-revert-buffers ()
+    "Auto revert's stale buffers (that are visible)."
+    (dolist (buf (doom-visible-buffers))
+      (with-current-buffer buf
+        (auto-revert-handler)))))
 
 (def-package! recentf
   ;; Keep track of recently opened files
@@ -208,6 +224,8 @@ savehist file."
   (add-hook! '(change-major-mode-after-body-hook read-only-mode-hook)
     #'doom|detect-indentation)
   :config
+  (setq dtrt-indent-run-after-smie t)
+
   ;; always keep tab-width up-to-date
   (push '(t tab-width) dtrt-indent-hook-generic-mapping-list)
 
@@ -281,7 +299,9 @@ savehist file."
     (when (memq this-command '(eval-expression evil-ex))
       (smartparens-mode)))
   (add-hook 'minibuffer-setup-hook #'doom|init-smartparens-in-eval-expression)
+
   (sp-local-pair 'minibuffer-inactive-mode "'" nil :actions nil)
+  (sp-local-pair 'minibuffer-inactive-mode "`" nil :actions nil)
 
   ;; smartparens breaks evil-mode's replace state
   (add-hook 'evil-replace-state-entry-hook #'turn-off-smartparens-mode)
@@ -294,7 +314,7 @@ savehist file."
   ;; Branching & persistent undo
   :after-call (doom-switch-buffer-hook after-find-file)
   :config
-  (setq undo-tree-auto-save-history t
+  (setq undo-tree-auto-save-history nil ; disable because unstable
         ;; undo-in-region is known to cause undo history corruption, which can
         ;; be very destructive! Disabling it deters the error, but does not fix
         ;; it entirely!

@@ -3,7 +3,8 @@
 (defvar +markdown-compile-functions
   '(+markdown-compile-marked
     +markdown-compile-pandoc
-    +markdown-compile-markdown)
+    +markdown-compile-markdown
+    +markdown-compile-multimarkdown)
   "A list of commands to try when attempting to build a markdown file with
 `markdown-open' or `markdown-preview', stopping at the first one to return non-nil.
 
@@ -66,10 +67,3 @@ capture, the end position, and the output buffer.")
             "t" #'markdown-toc-generate-toc
             "i" #'markdown-insert-image
             "l" #'markdown-insert-link))))
-
-
-(def-package! pandoc-mode
-  :when (featurep! +pandoc)
-  :commands pandoc-mode
-  :hook (markdown-mode . conditionally-turn-on-pandoc)
-  :init (setq markdown-command "pandoc --from=markdown --to=html --standalone --mathjax --highlight-style=pygments"))
